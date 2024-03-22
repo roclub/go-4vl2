@@ -7,7 +7,7 @@ import (
 	"os"
 	sys "syscall"
 
-	"github.com/vladimirvivien/go4vl/v4l2"
+	"github.com/roclub/go-4vl2/v4l2"
 )
 
 type Device struct {
@@ -22,6 +22,12 @@ type Device struct {
 	requestedBuf v4l2.RequestBuffers
 	streaming    bool
 	output       chan []byte
+}
+
+type DvTimings struct {
+	Width  uint32
+	Height uint32
+	FPS    uint32
 }
 
 // Open creates opens the underlying device at specified path for streaming.
@@ -97,17 +103,6 @@ func Open(path string, options ...Option) (*Device, error) {
 		dev.config.pixFormat, err = v4l2.GetPixFormat(dev.fd)
 		if err != nil {
 			return nil, fmt.Errorf("device open: %s: get default format: %w", path, err)
-		}
-	}
-
-	// set fps
-	if dev.config.fps != 0 {
-		if err := dev.SetFrameRate(dev.config.fps); err != nil {
-			return nil, fmt.Errorf("device open: %s: set fps: %w", path, err)
-		}
-	} else {
-		if dev.config.fps, err = dev.GetFrameRate(); err != nil {
-			return nil, fmt.Errorf("device open: %s: get fps: %w", path, err)
 		}
 	}
 
@@ -257,6 +252,34 @@ func (d *Device) GetVideoInputInfo(index uint32) (v4l2.InputInfo, error) {
 	}
 
 	return v4l2.GetVideoInputInfo(d.fd, index)
+}
+
+// GetDetectedDvTimings returns detected signal resolution
+func (d *Device) GetDetectedDvTimings() (DvTimings, error) {
+	width, height, fps, err := v4l2.QueryDvTimings(d.fd)
+	if err != nil {
+		return DvTimings{}, fmt.Errorf("device: get detected dv timings: %w", err)
+	}
+
+	return DvTimings{
+		Width:  uint32(width),
+		Height: uint32(height),
+		FPS:    uint32(fps),
+	}, nil
+}
+
+// GetConfiguredDvTimings returns configured signal resolution
+func (d *Device) GetConfiguredDvTimings() (DvTimings, error) {
+	width, height, fps, err := v4l2.GetDvTimings(d.fd)
+	if err != nil {
+		return DvTimings{}, fmt.Errorf("device: get configured dv timings: %w", err)
+	}
+
+	return DvTimings{
+		Width:  uint32(width),
+		Height: uint32(height),
+		FPS:    uint32(fps),
+	}, nil
 }
 
 // GetStreamParam returns streaming parameter information for device
